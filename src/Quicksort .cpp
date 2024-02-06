@@ -25,7 +25,7 @@ void Quicksort::quicksort(int* array, long left, long right) {
     } while(left_bound <= right_bound);
 
     if(left_bound < right) {
-        if(right_bound - left > 10000) {
+        if(right - left_bound > 10000) {
             
             auto left_promise = std::make_shared<std::promise<void>>();
             auto left_future = left_promise->get_future().share();
@@ -40,9 +40,9 @@ void Quicksort::quicksort(int* array, long left, long right) {
             left_future.get();
         } else {
             // Если элементов меньше max_elements_, сортируем синхронно
-            quicksort(array, left, right_bound);
+            quicksort(array, left_bound, right);
         }
-        if(right - left_bound > 10000) {
+        if(right_bound - left > 10000) {
             auto right_promise = std::make_shared<std::promise<void>>();
             auto right_future = right_promise->get_future().share();
 
@@ -55,7 +55,7 @@ void Quicksort::quicksort(int* array, long left, long right) {
             right_future.get();
         } else {
             // Если элементов меньше max_elements_, сортируем синхронно
-            quicksort(array, left_bound, right);
+            quicksort(array, left, right_bound);
         }
     }
 }
