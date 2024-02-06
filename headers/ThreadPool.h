@@ -3,34 +3,71 @@
 #include <future>
 #include <queue>
 #include <vector>
-#include "BlockedQueue.h"
-      
-typedef std::function<void()> task_type;  // псевдоним task_type функции void  name()          
-typedef void (*FuncType)(int, int);  // псевдоним FuncType на указатель для функции void name(int, int)
+
+class Quicksort;
+
+typedef std::function<void()> task_type; // псевдоним task_type функции void  name()
+//typedef void (*FuncType)(ThreadPool*, int*, long, long, std::shared_ptr<std::promise<void>>);
+typedef std::function<void(int*, long, long)> FuncType;
+
+template <class T> class BlockedQueue {
+  public:
+    // обычный потокобезопасный push
+    void push(T& item) {
+        std::lock_guard<std::mutex> l(m_locker); // захватываем мьютекс
+        //m_task_queue.push(item); // добавляем элемент в очередь
+        m_task_queue.push_back(item); // добавляем элемент в очередь
+        // делаем оповещение, чтобы поток, вызвавший
+        // pop проснулся и забрал элемент из очереди
+        m_event_holder.notify_one();
+    }
+
+    // блокирующий метод получения элемента из очереди
+    void pop(T& item) {
+        std::unique_lock<std::mutex> l(m_locker); // захватываем мьютекс
+        if(m_task_queue.empty()) {                // если очередь пуста
+            m_event_holder.wait(l, [this] {
+                return !m_task_queue.empty();
+            }); // ждем, когда появится элемент в очереди
+        }
+        item = m_task_queue.front(); // забираем первый элемент из очереди
+        m_task_queue.pop_front();          // удаляем его из очереди
+    }
+
+    // неблокирующий метод получения элемента из очереди
+    // возвращает false, если очередь пуста
+    bool fast_pop(T& item) {
+        std::lock_guard<std::mutex> l(m_locker); // захватываем мьютекс
+        if(m_task_queue.empty())                 // если очередь пуста
+            return false;                        // выходим
+        item = m_task_queue.front();             // иначе забираем элемент
+        //m_task_queue.pop();                      // удаляем его из очереди
+        m_task_queue.pop_front();
+        return true;
+    }
+
+  private:
+    std::mutex m_locker;
+    //std::queue<std::function<void()>> m_task_queue; // очередь задач
+    std::deque<T> m_task_queue; // очередь задач
+    std::condition_variable m_event_holder;         // уведомитель
+};
 
 // пул потоков для задач
 class ThreadPool {
   public:
     ThreadPool();
-    void start();                                // запуск
-    void stop();                                 // остановка
-    void push_task(FuncType f, int id, int arg); // проброс задач
-
-    // функция входа для потока
-    //void threadFunc();                           
-    void threadFunc(int qindex);                 // функция входа для потока
+    void start(); // запуск
+    void stop();  // остановка
+    void push_task (FuncType f, std::shared_ptr<std::promise<void>>& promise, int* array, long left, long right);
+    void threadFunc(int qindex); // функция входа для потока
 
   private:
-/*
-    std::vector<std::thread> m_threads;         // потоки
-    std::queue<task_type> m_task_queue;         // очередь задач
-    std::mutex m_locker;                        // поддержка синхронизации очереди    
-    std::condition_variable m_event_holder;     // для синхронизации работы потоков
-    volatile bool m_work;                       // флаг для остановки работы потоков
-*/     
-    int m_thread_count;                         // количество потоков       
-    std::vector<std::thread> m_threads;         // потоки       
-    std::vector<BlockedQueue<task_type>> m_thread_queues;     // Это массив (или контейнер) очередей, в которых хранятся задачи для каждого потока в пуле.  
-    int m_index;                                // для равномерного распределения задач
-
+    int m_thread_count;                 // количество потоков в пуле
+    std::vector<std::thread> m_threads; // потоки
+    std::vector<BlockedQueue<task_type>>
+        m_thread_queues; // Это массив (или контейнер) очередей, в которых хранятся задачи для
+                         // каждого потока в пуле.
+    int m_index; // для равномерного распределения задач
+    //std::shared_future<void> shared_future_;
 };

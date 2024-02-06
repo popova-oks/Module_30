@@ -1,40 +1,40 @@
 #include <iostream>
 #include <thread>
+#include <vector>
+#include <future>
+#include <memory>
 #include <chrono>
-
 #include "../headers/ThreadPool.h"
-#include "../headers/RequestHandler.h"
-#include "../headers/BlockedQueue.h"
+#include "../headers/Quicksort .h"
 
-std::mutex coutLocker; // мьютекс для консоли
 using namespace std;
 
+int main() {
+    constexpr int arr_size = 1000000;
+    int* array = new int[arr_size];
 
-// функция, выполняющая задачу
-void taskFunc(int id, int delay){
-   // имитируем время выполнения задачи
-   std::this_thread::sleep_for(std::chrono::seconds(delay));
-   // выводим информацию о завершении
-   std::unique_lock<std::mutex> l(coutLocker);
-   std::cout << "task " << id << " made by thread_id " << std::this_thread::get_id() << std::endl;
-}
-
-// функция, выполняющая задачу
-void taskFunc2(int id, int delay){
-   // имитируем время выполнения задачи
-   std::this_thread::sleep_for(std::chrono::microseconds(delay));
-   // выводим информацию о завершении
-   std::unique_lock<std::mutex> l(coutLocker);
-   std::cout << "task " << id << " made by thread_id " << std::this_thread::get_id() << std::endl;
-}
-
-int main()
-{
-    srand(0);
-    RequestHandler rh;
-    for(int i=0; i<20; i++) {
-       rh.pushRequest(taskFunc2, i, 1 + rand()%4);
+    for (int i = 0; i < arr_size; ++i) {
+        array[i] = rand() % 1000000;
     }
 
+    ThreadPool threadPool;
+    Quicksort qsort(threadPool, array, 0, arr_size - 1, 100000);
+    auto start = chrono::high_resolution_clock::now();    
+    // Запускаем параллельную сортировку
+    qsort();
+    auto end = chrono::high_resolution_clock::now();
+
+
+    for(long i = 0; i < arr_size - 1; i++) { // Проверяем сортировку
+        if(array[i] > array[i + 1]) {
+            cout << "Unsorted" << endl;
+            break;
+        }
+    }
+
+    chrono::duration<double> elapsed = end - start;
+    cout << "Time: " << elapsed.count() << " seconds" << endl;
+
+    delete[] array;
     return 0;
 }
